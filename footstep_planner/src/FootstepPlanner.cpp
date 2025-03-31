@@ -21,93 +21,62 @@
 #include <footstep_planner/FootstepPlanner.h>
 #include <humanoid_nav_msgs/ClipFootstep.h>
 
-
 using gridmap_2d::GridMap2D;
 using gridmap_2d::GridMap2DPtr;
-
 
 namespace footstep_planner
 {
 FootstepPlanner::FootstepPlanner()
-: ivStartPoseSetUp(false),
-  ivGoalPoseSetUp(false),
-  ivLastMarkerMsgSize(0),
-  ivPathCost(0),
-  ivMarkerNamespace("")
+  : ivStartPoseSetUp(false), ivGoalPoseSetUp(false), ivLastMarkerMsgSize(0), ivPathCost(0), ivMarkerNamespace("")
 {
   // private NodeHandle for parameters and private messages (debug / info)
   ros::NodeHandle nh_private("~");
   ros::NodeHandle nh_public;
 
   // ..publishers
-  ivExpandedStatesVisPub = nh_private.advertise<
-      sensor_msgs::PointCloud>("expanded_states", 1);
-  ivRandomStatesVisPub = nh_private.advertise<
-      sensor_msgs::PointCloud>("random_states", 1);
-  ivFootstepPathVisPub = nh_private.advertise<
-      visualization_msgs::MarkerArray>("footsteps_array", 1);
-  ivHeuristicPathVisPub = nh_private.advertise<
-      nav_msgs::Path>("heuristic_path", 1);
+  ivExpandedStatesVisPub = nh_private.advertise<sensor_msgs::PointCloud>("expanded_states", 1);
+  ivRandomStatesVisPub = nh_private.advertise<sensor_msgs::PointCloud>("random_states", 1);
+  ivFootstepPathVisPub = nh_private.advertise<visualization_msgs::MarkerArray>("footsteps_array", 1);
+  ivHeuristicPathVisPub = nh_private.advertise<nav_msgs::Path>("heuristic_path", 1);
   ivPathVisPub = nh_private.advertise<nav_msgs::Path>("path", 1);
-  ivStartPoseVisPub = nh_private.advertise<
-      geometry_msgs::PoseStamped>("start", 1);
+  ivStartPoseVisPub = nh_private.advertise<geometry_msgs::PoseStamped>("start", 1);
 
   std::string heuristic_type;
   double diff_angle_cost;
 
   // read parameters from config file:
   // planner environment settings
-  nh_private.param("heuristic_type", heuristic_type,
-                   std::string("EuclideanHeuristic"));
+  nh_private.param("heuristic_type", heuristic_type, std::string("EuclideanHeuristic"));
   nh_private.param("heuristic_scale", ivEnvironmentParams.heuristic_scale, 1.0);
   nh_private.param("max_hash_size", ivEnvironmentParams.hash_table_size, 65536);
-  nh_private.param("accuracy/collision_check",
-                   ivEnvironmentParams.collision_check_accuracy,
-                   2);
+  nh_private.param("accuracy/collision_check", ivEnvironmentParams.collision_check_accuracy, 2);
   nh_private.param("accuracy/cell_size", ivEnvironmentParams.cell_size, 0.01);
-  nh_private.param("accuracy/num_angle_bins",
-                   ivEnvironmentParams.num_angle_bins,
-                   64);
+  nh_private.param("accuracy/num_angle_bins", ivEnvironmentParams.num_angle_bins, 64);
   nh_private.param("step_cost", ivEnvironmentParams.step_cost, 0.05);
   nh_private.param("diff_angle_cost", diff_angle_cost, 0.0);
 
   nh_private.param("planner_type", ivPlannerType, std::string("ARAPlanner"));
-  nh_private.param("search_until_first_solution", ivSearchUntilFirstSolution,
-                   false);
+  nh_private.param("search_until_first_solution", ivSearchUntilFirstSolution, false);
   nh_private.param("allocated_time", ivMaxSearchTime, 7.0);
   nh_private.param("forward_search", ivEnvironmentParams.forward_search, false);
   nh_private.param("initial_epsilon", ivInitialEpsilon, 3.0);
   nh_private.param("changed_cells_limit", ivChangedCellsLimit, 20000);
-  nh_private.param("num_random_nodes", ivEnvironmentParams.num_random_nodes,
-                   20);
-  nh_private.param("random_node_dist", ivEnvironmentParams.random_node_distance,
-                   1.0);
+  nh_private.param("num_random_nodes", ivEnvironmentParams.num_random_nodes, 20);
+  nh_private.param("random_node_dist", ivEnvironmentParams.random_node_distance, 1.0);
 
   // footstep settings
   nh_private.param("foot/size/x", ivEnvironmentParams.footsize_x, 0.16);
   nh_private.param("foot/size/y", ivEnvironmentParams.footsize_y, 0.06);
   nh_private.param("foot/size/z", ivEnvironmentParams.footsize_z, 0.015);
   nh_private.param("foot/separation", ivFootSeparation, 0.1);
-  nh_private.param("foot/origin_shift/x",
-                   ivEnvironmentParams.foot_origin_shift_x,
-                   0.02);
-  nh_private.param("foot/origin_shift/y",
-                   ivEnvironmentParams.foot_origin_shift_y,
-                   0.0);
+  nh_private.param("foot/origin_shift/x", ivEnvironmentParams.foot_origin_shift_x, 0.02);
+  nh_private.param("foot/origin_shift/y", ivEnvironmentParams.foot_origin_shift_y, 0.0);
   nh_private.param("foot/max/step/x", ivEnvironmentParams.max_footstep_x, 0.08);
   nh_private.param("foot/max/step/y", ivEnvironmentParams.max_footstep_y, 0.16);
-  nh_private.param("foot/max/step/theta",
-                   ivEnvironmentParams.max_footstep_theta,
-                   0.3);
-  nh_private.param("foot/max/inverse/step/x",
-                   ivEnvironmentParams.max_inverse_footstep_x,
-                   -0.04);
-  nh_private.param("foot/max/inverse/step/y",
-                   ivEnvironmentParams.max_inverse_footstep_y,
-                   0.09);
-  nh_private.param("foot/max/inverse/step/theta",
-                   ivEnvironmentParams.max_inverse_footstep_theta,
-                   -0.3);
+  nh_private.param("foot/max/step/theta", ivEnvironmentParams.max_footstep_theta, 0.3);
+  nh_private.param("foot/max/inverse/step/x", ivEnvironmentParams.max_inverse_footstep_x, -0.04);
+  nh_private.param("foot/max/inverse/step/y", ivEnvironmentParams.max_inverse_footstep_y, 0.09);
+  nh_private.param("foot/max/inverse/step/theta", ivEnvironmentParams.max_inverse_footstep_theta, -0.3);
 
   // footstep discretization
   XmlRpc::XmlRpcValue footsteps_x;
@@ -134,19 +103,17 @@ FootstepPlanner::FootstepPlanner()
   // create footstep set
   ivEnvironmentParams.footstep_set.clear();
   double max_step_width = 0;
-  for(int i=0; i < footsteps_x.size(); ++i)
+  for (int i = 0; i < footsteps_x.size(); ++i)
   {
     double x = (double)footsteps_x[i];
     double y = (double)footsteps_y[i];
     double theta = (double)footsteps_theta[i];
 
-    Footstep f(x, y, theta,
-               ivEnvironmentParams.cell_size,
-               ivEnvironmentParams.num_angle_bins,
+    Footstep f(x, y, theta, ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
                ivEnvironmentParams.hash_table_size);
     ivEnvironmentParams.footstep_set.push_back(f);
 
-    double cur_step_width = sqrt(x*x + y*y);
+    double cur_step_width = sqrt(x * x + y * y);
 
     if (cur_step_width > max_step_width)
       max_step_width = cur_step_width;
@@ -173,7 +140,7 @@ FootstepPlanner::FootstepPlanner()
   double max_x = 0.0;
   double max_y = 0.0;
   double cell_size = ivEnvironmentParams.cell_size;
-  for (int i=0; i < step_range_x.size(); ++i)
+  for (int i = 0; i < step_range_x.size(); ++i)
   {
     x = (double)step_range_x[i];
     y = (double)step_range_y[i];
@@ -181,49 +148,35 @@ FootstepPlanner::FootstepPlanner()
       max_x = fabs(x);
     if (fabs(y) > max_y)
       max_y = fabs(y);
-    ivEnvironmentParams.step_range.push_back(
-      std::pair<int, int>(disc_val(x, cell_size), disc_val(y, cell_size)));
+    ivEnvironmentParams.step_range.push_back(std::pair<int, int>(disc_val(x, cell_size), disc_val(y, cell_size)));
   }
   // insert first point again at the end!
   ivEnvironmentParams.step_range.push_back(ivEnvironmentParams.step_range[0]);
-  ivEnvironmentParams.max_step_width = sqrt(max_x*max_x + max_y*max_y) * 1.5;
+  ivEnvironmentParams.max_step_width = sqrt(max_x * max_x + max_y * max_y) * 1.5;
 
   // initialize the heuristic
   boost::shared_ptr<Heuristic> h;
   if (heuristic_type == "EuclideanHeuristic")
   {
-    h.reset(
-        new EuclideanHeuristic(ivEnvironmentParams.cell_size,
-                               ivEnvironmentParams.num_angle_bins));
+    h.reset(new EuclideanHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins));
     ROS_INFO("FootstepPlanner heuristic: euclidean distance");
   }
-  else if(heuristic_type == "EuclStepCostHeuristic")
+  else if (heuristic_type == "EuclStepCostHeuristic")
   {
-    h.reset(
-        new EuclStepCostHeuristic(ivEnvironmentParams.cell_size,
-                                  ivEnvironmentParams.num_angle_bins,
-                                  ivEnvironmentParams.step_cost,
-                                  diff_angle_cost,
-                                  max_step_width));
+    h.reset(new EuclStepCostHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
+                                      ivEnvironmentParams.step_cost, diff_angle_cost, max_step_width));
     ROS_INFO("FootstepPlanner heuristic: euclidean distance with step costs");
   }
   else if (heuristic_type == "PathCostHeuristic")
   {
     // for heuristic inflation
     double foot_incircle =
-      std::min((ivEnvironmentParams.footsize_x / 2.0 -
-                std::abs(ivEnvironmentParams.foot_origin_shift_x)),
-               (ivEnvironmentParams.footsize_y / 2.0 -
-                std::abs(ivEnvironmentParams.foot_origin_shift_y)));
+        std::min((ivEnvironmentParams.footsize_x / 2.0 - std::abs(ivEnvironmentParams.foot_origin_shift_x)),
+                 (ivEnvironmentParams.footsize_y / 2.0 - std::abs(ivEnvironmentParams.foot_origin_shift_y)));
     assert(foot_incircle > 0.0);
 
-    h.reset(
-        new PathCostHeuristic(ivEnvironmentParams.cell_size,
-                              ivEnvironmentParams.num_angle_bins,
-                              ivEnvironmentParams.step_cost,
-                              diff_angle_cost,
-                              max_step_width,
-                              foot_incircle));
+    h.reset(new PathCostHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
+                                  ivEnvironmentParams.step_cost, diff_angle_cost, max_step_width, foot_incircle));
     ROS_INFO("FootstepPlanner heuristic: 2D path euclidean distance with step "
              "costs");
 
@@ -232,27 +185,26 @@ FootstepPlanner::FootstepPlanner()
   }
   else
   {
-    ROS_ERROR_STREAM("Heuristic " << heuristic_type << " not available, "
-                     "exiting.");
+    ROS_ERROR_STREAM("Heuristic " << heuristic_type
+                                  << " not available, "
+                                     "exiting.");
     exit(1);
   }
   ivEnvironmentParams.heuristic = h;
 
   // initialize the planner environment
-  ivPlannerEnvironmentPtr.reset(
-    new FootstepPlannerEnvironment(ivEnvironmentParams));
+  ivPlannerEnvironmentPtr.reset(new FootstepPlannerEnvironment(ivEnvironmentParams));
 
   // set up planner
-  if (ivPlannerType == "ARAPlanner" ||
-      ivPlannerType == "ADPlanner"  ||
-      ivPlannerType == "RSTARPlanner" )
+  if (ivPlannerType == "ARAPlanner" || ivPlannerType == "ADPlanner" || ivPlannerType == "RSTARPlanner")
   {
     ROS_INFO_STREAM("Planning with " << ivPlannerType);
   }
   else
   {
-    ROS_ERROR_STREAM("Planner "<< ivPlannerType <<" not available / "
-                     "untested.");
+    ROS_ERROR_STREAM("Planner " << ivPlannerType
+                                << " not available / "
+                                   "untested.");
     exit(1);
   }
   if (ivEnvironmentParams.forward_search)
@@ -266,31 +218,23 @@ FootstepPlanner::FootstepPlanner()
   setPlanner();
 }
 
-
 FootstepPlanner::~FootstepPlanner()
-{}
+{
+}
 
-
-void
-FootstepPlanner::setPlanner()
+void FootstepPlanner::setPlanner()
 {
   if (ivPlannerType == "ARAPlanner")
   {
-    ivPlannerPtr.reset(
-        new ARAPlanner(ivPlannerEnvironmentPtr.get(),
-                       ivEnvironmentParams.forward_search));
+    ivPlannerPtr.reset(new ARAPlanner(ivPlannerEnvironmentPtr.get(), ivEnvironmentParams.forward_search));
   }
   else if (ivPlannerType == "ADPlanner")
   {
-    ivPlannerPtr.reset(
-        new ADPlanner(ivPlannerEnvironmentPtr.get(),
-                      ivEnvironmentParams.forward_search));
+    ivPlannerPtr.reset(new ADPlanner(ivPlannerEnvironmentPtr.get(), ivEnvironmentParams.forward_search));
   }
   else if (ivPlannerType == "RSTARPlanner")
   {
-    RSTARPlanner* p =
-        new RSTARPlanner(ivPlannerEnvironmentPtr.get(),
-                         ivEnvironmentParams.forward_search);
+    RSTARPlanner* p = new RSTARPlanner(ivPlannerEnvironmentPtr.get(), ivEnvironmentParams.forward_search);
     // new options, require patched SBPL
     //          p->set_local_expand_thres(500);
     //          p->set_eps_step(1.0);
@@ -301,9 +245,7 @@ FootstepPlanner::setPlanner()
   //        	                                  ivForwardSearch));
 }
 
-
-bool
-FootstepPlanner::run()
+bool FootstepPlanner::run()
 {
   bool path_existed = (bool)ivPath.size();
   int ret = 0;
@@ -318,15 +260,12 @@ FootstepPlanner::run()
   ivPlannerEnvironmentPtr->InitializeMDPCfg(&mdp_config);
 
   // inform AD planner about changed (start) states for replanning
-  if (path_existed &&
-      !ivEnvironmentParams.forward_search &&
-      ivPlannerType == "ADPlanner")
+  if (path_existed && !ivEnvironmentParams.forward_search && ivPlannerType == "ADPlanner")
   {
     std::vector<int> changed_edges;
     changed_edges.push_back(mdp_config.startstateid);
     // update the AD planner
-    boost::shared_ptr<ADPlanner> ad_planner =
-      boost::dynamic_pointer_cast<ADPlanner>(ivPlannerPtr);
+    boost::shared_ptr<ADPlanner> ad_planner = boost::dynamic_pointer_cast<ADPlanner>(ivPlannerPtr);
     ad_planner->update_preds_of_changededges(&changed_edges);
   }
 
@@ -345,15 +284,13 @@ FootstepPlanner::run()
   ivPlannerPtr->set_initialsolution_eps(ivInitialEpsilon);
   ivPlannerPtr->set_search_mode(ivSearchUntilFirstSolution);
 
-  ROS_INFO("Start planning (max time: %f, initial eps: %f (%f))\n",
-           ivMaxSearchTime, ivInitialEpsilon,
+  ROS_INFO("Start planning (max time: %f, initial eps: %f (%f))\n", ivMaxSearchTime, ivInitialEpsilon,
            ivPlannerPtr->get_initial_eps());
   int path_cost;
   ros::WallTime startTime = ros::WallTime::now();
   try
   {
-    ret = ivPlannerPtr->replan(ivMaxSearchTime, &solution_state_ids,
-                               &path_cost);
+    ret = ivPlannerPtr->replan(ivMaxSearchTime, &solution_state_ids, &path_cost);
   }
   catch (const SBPL_Exception& e)
   {
@@ -368,14 +305,12 @@ FootstepPlanner::run()
     if (!path_is_new)
       ROS_WARN("Solution found by SBPL is the same as the old solution. This could indicate that replanning failed.");
 
-    ROS_INFO("Solution of size %zu found after %f s",
-             solution_state_ids.size(),
-             (ros::WallTime::now()-startTime).toSec());
+    ROS_INFO("Solution of size %zu found after %f s", solution_state_ids.size(),
+             (ros::WallTime::now() - startTime).toSec());
 
     if (extractPath(solution_state_ids))
     {
-      ROS_INFO("Expanded states: %i total / %i new",
-               ivPlannerEnvironmentPtr->getNumExpandedStates(),
+      ROS_INFO("Expanded states: %i total / %i new", ivPlannerEnvironmentPtr->getNumExpandedStates(),
                ivPlannerPtr->get_n_expands());
       ROS_INFO("Final eps: %f", ivPlannerPtr->get_final_epsilon());
       ROS_INFO("Path cost: %f (%i)\n", ivPathCost, path_cost);
@@ -405,9 +340,7 @@ FootstepPlanner::run()
   }
 }
 
-
-bool
-FootstepPlanner::extractPath(const std::vector<int>& state_ids)
+bool FootstepPlanner::extractPath(const std::vector<int>& state_ids)
 {
   ivPath.clear();
 
@@ -437,7 +370,7 @@ FootstepPlanner::extractPath(const std::vector<int>& state_ids)
     ivPath.push_back(start_left);
   ivPath.push_back(s);
 
-  for(; state_ids_iter < state_ids.end(); ++state_ids_iter)
+  for (; state_ids_iter < state_ids.end(); ++state_ids_iter)
   {
     if (!ivPlannerEnvironmentPtr->getState(*state_ids_iter, &s))
     {
@@ -450,15 +383,13 @@ FootstepPlanner::extractPath(const std::vector<int>& state_ids)
   // add last neutral step
   if (ivPath.back().getLeg() == RIGHT)
     ivPath.push_back(ivGoalFootLeft);
-  else // last_leg == LEFT
+  else  // last_leg == LEFT
     ivPath.push_back(ivGoalFootRight);
 
   return true;
 }
 
-
-void
-FootstepPlanner::reset()
+void FootstepPlanner::reset()
 {
   ROS_INFO("Resetting planner");
   // reset the previously calculated paths
@@ -468,28 +399,23 @@ FootstepPlanner::reset()
   // INFO: force_planning_from_scratch was not working properly the last time
   // checked; therefore instead of using this function the planner is manually
   // reset
-  //ivPlannerPtr->force_planning_from_scratch();
+  // ivPlannerPtr->force_planning_from_scratch();
   ivPlannerEnvironmentPtr->reset();
   setPlanner();
 }
 
-
-void
-FootstepPlanner::resetTotally()
+void FootstepPlanner::resetTotally()
 {
   ROS_INFO("Resetting planner and environment");
   // reset the previously calculated paths
   ivPath.clear();
   ivPlanningStatesIds.clear();
   // reinitialize the planner environment
-  ivPlannerEnvironmentPtr.reset(
-      new FootstepPlannerEnvironment(ivEnvironmentParams));
+  ivPlannerEnvironmentPtr.reset(new FootstepPlannerEnvironment(ivEnvironmentParams));
   setPlanner();
 }
 
-
-bool
-FootstepPlanner::plan(bool force_new_plan)
+bool FootstepPlanner::plan(bool force_new_plan)
 {
   if (!ivMapPtr)
   {
@@ -503,8 +429,7 @@ FootstepPlanner::plan(bool force_new_plan)
     return false;
   }
 
-  if (force_new_plan
-      || ivPlannerType == "RSTARPlanner" || ivPlannerType == "ARAPlanner" )
+  if (force_new_plan || ivPlannerType == "RSTARPlanner" || ivPlannerType == "ARAPlanner")
   {
     reset();
   }
@@ -512,31 +437,22 @@ FootstepPlanner::plan(bool force_new_plan)
   return run();
 }
 
-
-bool
-FootstepPlanner::replan()
+bool FootstepPlanner::replan()
 {
   return plan(false);
 }
 
-
-bool
-FootstepPlanner::plan(const geometry_msgs::PoseStampedConstPtr start,
-                      const geometry_msgs::PoseStampedConstPtr goal)
+bool FootstepPlanner::plan(const geometry_msgs::PoseStampedConstPtr start,
+                           const geometry_msgs::PoseStampedConstPtr goal)
 {
-  return plan(start->pose.position.x, start->pose.position.y,
-              tf::getYaw(start->pose.orientation),
-              goal->pose.position.x, goal->pose.position.y,
-              tf::getYaw(goal->pose.orientation));
+  return plan(start->pose.position.x, start->pose.position.y, tf::getYaw(start->pose.orientation),
+              goal->pose.position.x, goal->pose.position.y, tf::getYaw(goal->pose.orientation));
 }
 
-
-bool
-FootstepPlanner::plan(float start_x, float start_y, float start_theta,
-                      float goal_x, float goal_y, float goal_theta)
+bool FootstepPlanner::plan(float start_x, float start_y, float start_theta, float goal_x, float goal_y,
+                           float goal_theta)
 {
-  if (!(setStart(start_x, start_y, start_theta) &&
-      setGoal(goal_x, goal_y, goal_theta)))
+  if (!(setStart(start_x, start_y, start_theta) && setGoal(goal_x, goal_y, goal_theta)))
   {
     return false;
   }
@@ -544,13 +460,10 @@ FootstepPlanner::plan(float start_x, float start_y, float start_theta,
   return plan(false);
 }
 
-
-bool
-FootstepPlanner::planService(humanoid_nav_msgs::PlanFootsteps::Request &req,
-                             humanoid_nav_msgs::PlanFootsteps::Response &resp)
+bool FootstepPlanner::planService(humanoid_nav_msgs::PlanFootsteps::Request& req,
+                                  humanoid_nav_msgs::PlanFootsteps::Response& resp)
 {
-  bool result = plan(req.start.x, req.start.y, req.start.theta,
-                     req.goal.x, req.goal.y, req.goal.theta);
+  bool result = plan(req.start.x, req.start.y, req.start.theta, req.goal.x, req.goal.y, req.goal.theta);
 
   resp.costs = getPathCosts();
   resp.footsteps.reserve(getPathSize());
@@ -565,16 +478,14 @@ FootstepPlanner::planService(humanoid_nav_msgs::PlanFootsteps::Request &req,
   return true;
 }
 
-
-bool
-FootstepPlanner::planFeetService(humanoid_nav_msgs::PlanFootstepsBetweenFeet::Request &req,
-                             humanoid_nav_msgs::PlanFootstepsBetweenFeet::Response &resp)
+bool FootstepPlanner::planFeetService(humanoid_nav_msgs::PlanFootstepsBetweenFeet::Request& req,
+                                      humanoid_nav_msgs::PlanFootstepsBetweenFeet::Response& resp)
 {
   // TODO check direction and change of states, force planning from scratch if does not fit
   setStart(State(req.start_left.pose.x, req.start_left.pose.y, req.start_left.pose.theta, LEFT),
            State(req.start_right.pose.x, req.start_right.pose.y, req.start_right.pose.theta, RIGHT));
   setGoal(State(req.goal_left.pose.x, req.goal_left.pose.y, req.goal_left.pose.theta, LEFT),
-           State(req.goal_right.pose.x, req.goal_right.pose.y, req.goal_right.pose.theta, RIGHT));
+          State(req.goal_right.pose.x, req.goal_right.pose.y, req.goal_right.pose.theta, RIGHT));
 
   bool result = plan(false);
 
@@ -591,8 +502,8 @@ FootstepPlanner::planFeetService(humanoid_nav_msgs::PlanFootstepsBetweenFeet::Re
   return true;
 }
 
-void
-FootstepPlanner::extractFootstepsSrv(std::vector<humanoid_nav_msgs::StepTarget> & footsteps) const{
+void FootstepPlanner::extractFootstepsSrv(std::vector<humanoid_nav_msgs::StepTarget>& footsteps) const
+{
   humanoid_nav_msgs::StepTarget foot;
   state_iter_t path_iter;
   for (path_iter = getPathBegin(); path_iter != getPathEnd(); ++path_iter)
@@ -606,21 +517,16 @@ FootstepPlanner::extractFootstepsSrv(std::vector<humanoid_nav_msgs::StepTarget> 
       foot.leg = humanoid_nav_msgs::StepTarget::right;
     else
     {
-      ROS_ERROR("Footstep pose at (%f, %f, %f) is set to NOLEG!",
-                path_iter->getX(), path_iter->getY(),
+      ROS_ERROR("Footstep pose at (%f, %f, %f) is set to NOLEG!", path_iter->getX(), path_iter->getY(),
                 path_iter->getTheta());
       continue;
     }
 
     footsteps.push_back(foot);
   }
-
 }
 
-
-void
-FootstepPlanner::goalPoseCallback(
-    const geometry_msgs::PoseStampedConstPtr& goal_pose)
+void FootstepPlanner::goalPoseCallback(const geometry_msgs::PoseStampedConstPtr& goal_pose)
 {
   // update the goal states in the environment
   if (setGoal(goal_pose))
@@ -633,13 +539,9 @@ FootstepPlanner::goalPoseCallback(
   }
 }
 
-
-void
-FootstepPlanner::startPoseCallback(
-    const geometry_msgs::PoseWithCovarianceStampedConstPtr& start_pose)
+void FootstepPlanner::startPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& start_pose)
 {
-  if (setStart(start_pose->pose.pose.position.x,
-               start_pose->pose.pose.position.y,
+  if (setStart(start_pose->pose.pose.position.x, start_pose->pose.pose.position.y,
                tf::getYaw(start_pose->pose.pose.orientation)))
   {
     if (ivGoalPoseSetUp)
@@ -650,10 +552,7 @@ FootstepPlanner::startPoseCallback(
   }
 }
 
-
-void
-FootstepPlanner::mapCallback(
-    const nav_msgs::OccupancyGridConstPtr& occupancy_map)
+void FootstepPlanner::mapCallback(const nav_msgs::OccupancyGridConstPtr& occupancy_map)
 {
   GridMap2DPtr map(new GridMap2D(occupancy_map));
 
@@ -666,18 +565,12 @@ FootstepPlanner::mapCallback(
   }
 }
 
-
-bool
-FootstepPlanner::setGoal(const geometry_msgs::PoseStampedConstPtr goal_pose)
+bool FootstepPlanner::setGoal(const geometry_msgs::PoseStampedConstPtr goal_pose)
 {
-  return setGoal(goal_pose->pose.position.x,
-                 goal_pose->pose.position.y,
-                 tf::getYaw(goal_pose->pose.orientation));
+  return setGoal(goal_pose->pose.position.x, goal_pose->pose.position.y, tf::getYaw(goal_pose->pose.orientation));
 }
 
-
-bool
-FootstepPlanner::setGoal(float x, float y, float theta)
+bool FootstepPlanner::setGoal(float x, float y, float theta)
 {
   if (!ivMapPtr)
   {
@@ -689,8 +582,7 @@ FootstepPlanner::setGoal(float x, float y, float theta)
   State foot_left = getFootPose(goal, LEFT);
   State foot_right = getFootPose(goal, RIGHT);
 
-  if (ivPlannerEnvironmentPtr->occupied(foot_left) ||
-      ivPlannerEnvironmentPtr->occupied(foot_right))
+  if (ivPlannerEnvironmentPtr->occupied(foot_left) || ivPlannerEnvironmentPtr->occupied(foot_right))
   {
     ROS_ERROR("Goal pose at (%f %f %f) not accessible.", x, y, theta);
     ivGoalPoseSetUp = false;
@@ -705,11 +597,9 @@ FootstepPlanner::setGoal(float x, float y, float theta)
   return true;
 }
 
-bool
-FootstepPlanner::setGoal(const State& left_foot, const State& right_foot)
+bool FootstepPlanner::setGoal(const State& left_foot, const State& right_foot)
 {
-  if (ivPlannerEnvironmentPtr->occupied(left_foot) ||
-      ivPlannerEnvironmentPtr->occupied(right_foot))
+  if (ivPlannerEnvironmentPtr->occupied(left_foot) || ivPlannerEnvironmentPtr->occupied(right_foot))
   {
     ivGoalPoseSetUp = false;
     return false;
@@ -722,21 +612,14 @@ FootstepPlanner::setGoal(const State& left_foot, const State& right_foot)
   return true;
 }
 
-
-bool
-FootstepPlanner::setStart(const geometry_msgs::PoseStampedConstPtr start_pose)
+bool FootstepPlanner::setStart(const geometry_msgs::PoseStampedConstPtr start_pose)
 {
-  return setStart(start_pose->pose.position.x,
-                  start_pose->pose.position.y,
-                  tf::getYaw(start_pose->pose.orientation));
+  return setStart(start_pose->pose.position.x, start_pose->pose.position.y, tf::getYaw(start_pose->pose.orientation));
 }
 
-
-bool
-FootstepPlanner::setStart(const State& left_foot, const State& right_foot)
+bool FootstepPlanner::setStart(const State& left_foot, const State& right_foot)
 {
-  if (ivPlannerEnvironmentPtr->occupied(left_foot) ||
-      ivPlannerEnvironmentPtr->occupied(right_foot))
+  if (ivPlannerEnvironmentPtr->occupied(left_foot) || ivPlannerEnvironmentPtr->occupied(right_foot))
   {
     ivStartPoseSetUp = false;
     return false;
@@ -749,9 +632,7 @@ FootstepPlanner::setStart(const State& left_foot, const State& right_foot)
   return true;
 }
 
-
-bool
-FootstepPlanner::setStart(float x, float y, float theta)
+bool FootstepPlanner::setStart(float x, float y, float theta)
 {
   if (!ivMapPtr)
   {
@@ -782,9 +663,7 @@ FootstepPlanner::setStart(float x, float y, float theta)
   return success;
 }
 
-
-bool
-FootstepPlanner::updateMap(const GridMap2DPtr map)
+bool FootstepPlanner::updateMap(const GridMap2DPtr map)
 {
   // store old map pointer locally
   GridMap2DPtr old_map = ivMapPtr;
@@ -804,16 +683,13 @@ FootstepPlanner::updateMap(const GridMap2DPtr map)
   return false;
 }
 
-
-void
-FootstepPlanner::updateEnvironment(const GridMap2DPtr old_map)
+void FootstepPlanner::updateEnvironment(const GridMap2DPtr old_map)
 {
   ROS_INFO("Reseting the planning environment.");
   // reset environment
   resetTotally();
   // set the new map
   ivPlannerEnvironmentPtr->updateMap(ivMapPtr);
-
 
   // The following is not used any more
 
@@ -920,26 +796,19 @@ FootstepPlanner::updateEnvironment(const GridMap2DPtr old_map)
   //        }
 }
 
-
-State
-FootstepPlanner::getFootPose(const State& robot, Leg leg)
+State FootstepPlanner::getFootPose(const State& robot, Leg leg)
 {
   double shift_x = -sin(robot.getTheta()) * ivFootSeparation / 2.0;
-  double shift_y =  cos(robot.getTheta()) * ivFootSeparation / 2.0;
+  double shift_y = cos(robot.getTheta()) * ivFootSeparation / 2.0;
 
   double sign = -1.0;
   if (leg == LEFT)
     sign = 1.0;
 
-  return State(robot.getX() + sign * shift_x,
-               robot.getY() + sign * shift_y,
-               robot.getTheta(),
-               leg);
+  return State(robot.getX() + sign * shift_x, robot.getY() + sign * shift_y, robot.getTheta(), leg);
 }
 
-
-bool
-FootstepPlanner::pathIsNew(const std::vector<int>& new_path)
+bool FootstepPlanner::pathIsNew(const std::vector<int>& new_path)
 {
   if (new_path.size() != ivPlanningStatesIds.size())
     return true;
@@ -951,16 +820,13 @@ FootstepPlanner::pathIsNew(const std::vector<int>& new_path)
   return unequal;
 }
 
-
-void
-FootstepPlanner::clearFootstepPathVis(unsigned num_footsteps)
+void FootstepPlanner::clearFootstepPathVis(unsigned num_footsteps)
 {
   visualization_msgs::Marker marker;
   visualization_msgs::MarkerArray marker_msg;
 
   marker.header.stamp = ros::Time::now();
   marker.header.frame_id = ivMapPtr->getFrameID();
-
 
   if (num_footsteps < 1)
     num_footsteps = ivLastMarkerMsgSize;
@@ -977,9 +843,7 @@ FootstepPlanner::clearFootstepPathVis(unsigned num_footsteps)
   ivFootstepPathVisPub.publish(marker_msg);
 }
 
-
-void
-FootstepPlanner::broadcastExpandedNodesVis()
+void FootstepPlanner::broadcastExpandedNodesVis()
 {
   if (ivExpandedStatesVisPub.getNumSubscribers() > 0)
   {
@@ -989,14 +853,11 @@ FootstepPlanner::broadcastExpandedNodesVis()
 
     State s;
     FootstepPlannerEnvironment::exp_states_2d_iter_t state_id_it;
-    for(state_id_it = ivPlannerEnvironmentPtr->getExpandedStatesStart();
-        state_id_it != ivPlannerEnvironmentPtr->getExpandedStatesEnd();
-        ++state_id_it)
+    for (state_id_it = ivPlannerEnvironmentPtr->getExpandedStatesStart();
+         state_id_it != ivPlannerEnvironmentPtr->getExpandedStatesEnd(); ++state_id_it)
     {
-      point.x = cell_2_state(state_id_it->first,
-                             ivEnvironmentParams.cell_size);
-      point.y = cell_2_state(state_id_it->second,
-                             ivEnvironmentParams.cell_size);
+      point.x = cell_2_state(state_id_it->first, ivEnvironmentParams.cell_size);
+      point.y = cell_2_state(state_id_it->second, ivEnvironmentParams.cell_size);
       point.z = 0.01;
       points.push_back(point);
     }
@@ -1009,9 +870,7 @@ FootstepPlanner::broadcastExpandedNodesVis()
   }
 }
 
-
-void
-FootstepPlanner::broadcastFootstepPathVis()
+void FootstepPlanner::broadcastFootstepPathVis()
 {
   if (getPathSize() == 0)
   {
@@ -1039,8 +898,7 @@ FootstepPlanner::broadcastFootstepPathVis()
   markers.push_back(marker);
 
   // add the footsteps of the path to the publish vector
-  for(state_iter_t path_iter = getPathBegin(); path_iter != getPathEnd();
-      ++path_iter)
+  for (state_iter_t path_iter = getPathBegin(); path_iter != getPathEnd(); ++path_iter)
   {
     footPoseToMarker(*path_iter, &marker);
     marker.id = markers_counter++;
@@ -1053,11 +911,10 @@ FootstepPlanner::broadcastFootstepPathVis()
   ivFootstepPathVisPub.publish(broadcast_msg);
 }
 
-
-void
-FootstepPlanner::broadcastRandomNodesVis()
+void FootstepPlanner::broadcastRandomNodesVis()
 {
-  if (ivRandomStatesVisPub.getNumSubscribers() > 0){
+  if (ivRandomStatesVisPub.getNumSubscribers() > 0)
+  {
     sensor_msgs::PointCloud cloud_msg;
     geometry_msgs::Point32 point;
     std::vector<geometry_msgs::Point32> points;
@@ -1070,9 +927,8 @@ FootstepPlanner::broadcastRandomNodesVis()
 
     State s;
     FootstepPlannerEnvironment::exp_states_iter_t state_id_iter;
-    for(state_id_iter = ivPlannerEnvironmentPtr->getRandomStatesStart();
-        state_id_iter != ivPlannerEnvironmentPtr->getRandomStatesEnd();
-        ++state_id_iter)
+    for (state_id_iter = ivPlannerEnvironmentPtr->getRandomStatesStart();
+         state_id_iter != ivPlannerEnvironmentPtr->getRandomStatesEnd(); ++state_id_iter)
     {
       if (!ivPlannerEnvironmentPtr->getState(*state_id_iter, &s))
       {
@@ -1095,9 +951,7 @@ FootstepPlanner::broadcastRandomNodesVis()
   }
 }
 
-
-void
-FootstepPlanner::broadcastPathVis()
+void FootstepPlanner::broadcastPathVis()
 {
   if (getPathSize() == 0)
   {
@@ -1112,7 +966,7 @@ FootstepPlanner::broadcastPathVis()
   state.header.frame_id = ivMapPtr->getFrameID();
 
   state_iter_t path_iter;
-  for(path_iter = getPathBegin(); path_iter != getPathEnd(); ++path_iter)
+  for (path_iter = getPathBegin(); path_iter != getPathEnd(); ++path_iter)
   {
     state.pose.position.x = path_iter->getX();
     state.pose.position.y = path_iter->getY();
@@ -1123,10 +977,7 @@ FootstepPlanner::broadcastPathVis()
   ivPathVisPub.publish(path_msg);
 }
 
-
-void
-FootstepPlanner::footPoseToMarker(const State& foot_pose,
-                                  visualization_msgs::Marker* marker)
+void FootstepPlanner::footPoseToMarker(const State& foot_pose, visualization_msgs::Marker* marker)
 {
   marker->header.stamp = ros::Time::now();
   marker->header.frame_id = ivMapPtr->getFrameID();
@@ -1136,23 +987,20 @@ FootstepPlanner::footPoseToMarker(const State& foot_pose,
 
   float cos_theta = cos(foot_pose.getTheta());
   float sin_theta = sin(foot_pose.getTheta());
-  float x_shift = cos_theta * ivEnvironmentParams.foot_origin_shift_x -
-                  sin_theta * ivEnvironmentParams.foot_origin_shift_y;
+  float x_shift =
+      cos_theta * ivEnvironmentParams.foot_origin_shift_x - sin_theta * ivEnvironmentParams.foot_origin_shift_y;
   float y_shift;
   if (foot_pose.getLeg() == LEFT)
-    y_shift = sin_theta * ivEnvironmentParams.foot_origin_shift_x +
-              cos_theta * ivEnvironmentParams.foot_origin_shift_y;
-  else // leg == RLEG
-    y_shift = sin_theta * ivEnvironmentParams.foot_origin_shift_x -
-              cos_theta * ivEnvironmentParams.foot_origin_shift_y;
+    y_shift = sin_theta * ivEnvironmentParams.foot_origin_shift_x + cos_theta * ivEnvironmentParams.foot_origin_shift_y;
+  else  // leg == RLEG
+    y_shift = sin_theta * ivEnvironmentParams.foot_origin_shift_x - cos_theta * ivEnvironmentParams.foot_origin_shift_y;
   marker->pose.position.x = foot_pose.getX() + x_shift;
   marker->pose.position.y = foot_pose.getY() + y_shift;
   marker->pose.position.z = ivEnvironmentParams.footsize_z / 2.0;
-  tf::quaternionTFToMsg(tf::createQuaternionFromYaw(foot_pose.getTheta()),
-                        marker->pose.orientation);
+  tf::quaternionTFToMsg(tf::createQuaternionFromYaw(foot_pose.getTheta()), marker->pose.orientation);
 
-  marker->scale.x = ivEnvironmentParams.footsize_x; // - 0.01;
-  marker->scale.y = ivEnvironmentParams.footsize_y; // - 0.01;
+  marker->scale.x = ivEnvironmentParams.footsize_x;  // - 0.01;
+  marker->scale.y = ivEnvironmentParams.footsize_y;  // - 0.01;
   marker->scale.z = ivEnvironmentParams.footsize_z;
 
   // TODO: make color configurable?
@@ -1161,14 +1009,14 @@ FootstepPlanner::footPoseToMarker(const State& foot_pose,
     marker->color.r = 0.0f;
     marker->color.g = 1.0f;
   }
-  else // leg == LEFT
-      {
+  else  // leg == LEFT
+  {
     marker->color.r = 1.0f;
     marker->color.g = 0.0f;
-      }
+  }
   marker->color.b = 0.0;
   marker->color.a = 0.6;
 
   marker->lifetime = ros::Duration();
 }
-}
+}  // namespace footstep_planner

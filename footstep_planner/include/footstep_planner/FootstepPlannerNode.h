@@ -21,13 +21,11 @@
 #ifndef FOOTSTEP_PLANNER_FOOTSTEPPLANNERNODE_H_
 #define FOOTSTEP_PLANNER_FOOTSTEPPLANNERNODE_H_
 
-
 #include <ros/ros.h>
 
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <footstep_planner/FootstepPlanner.h>
-
 
 namespace footstep_planner
 {
@@ -52,5 +50,5 @@ protected:
   ros::ServiceServer ivFootstepPlanService;
   ros::ServiceServer ivFootstepPlanFeetService;
 };
-}
+}  // namespace footstep_planner
 #endif  // FOOTSTEP_PLANNER_FOOTSTEPPLANNERNODE_H_

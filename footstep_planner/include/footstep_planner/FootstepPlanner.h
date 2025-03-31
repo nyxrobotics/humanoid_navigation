@@ -18,7 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef FOOTSTEP_PLANNER_FOOTSTEPPLANNER_H_
 #define FOOTSTEP_PLANNER_FOOTSTEPPLANNER_H_
 
@@ -45,7 +44,6 @@
 #include <assert.h>
 #include <time.h>
 
-
 namespace footstep_planner
 {
 typedef std::vector<State>::const_iterator state_iter_t;
@@ -67,15 +65,13 @@ public:
    *
    * @return Success of planning.
    */
-  bool plan(bool force_new_plan=true);
+  bool plan(bool force_new_plan = true);
 
   /// @brief Sets start, goal poses and calls FootstepPlanner::plan().
-  bool plan(const geometry_msgs::PoseStampedConstPtr start,
-            const geometry_msgs::PoseStampedConstPtr goal);
+  bool plan(const geometry_msgs::PoseStampedConstPtr start, const geometry_msgs::PoseStampedConstPtr goal);
 
   /// @brief Sets start, goal poses and calls FootstepPlanner::plan().
-  bool plan(float start_x, float start_y, float start_theta,
-            float goal_x, float goal_y, float goal_theta);
+  bool plan(float start_x, float start_y, float start_theta, float goal_x, float goal_y, float goal_theta);
 
   /**
    * @brief Starts a planning task based on previous planning information
@@ -87,12 +83,11 @@ public:
   bool replan();
 
   /// @brief Service handle to plan footsteps.
-  bool planService(humanoid_nav_msgs::PlanFootsteps::Request &req,
-                   humanoid_nav_msgs::PlanFootsteps::Response &resp);
+  bool planService(humanoid_nav_msgs::PlanFootsteps::Request& req, humanoid_nav_msgs::PlanFootsteps::Response& resp);
 
   /// @brief Service handle to plan footsteps.
-  bool planFeetService(humanoid_nav_msgs::PlanFootstepsBetweenFeet::Request &req,
-                   humanoid_nav_msgs::PlanFootstepsBetweenFeet::Response &resp);
+  bool planFeetService(humanoid_nav_msgs::PlanFootstepsBetweenFeet::Request& req,
+                       humanoid_nav_msgs::PlanFootstepsBetweenFeet::Response& resp);
 
   /**
    * @brief Sets the goal pose as two feet (left / right)
@@ -164,8 +159,7 @@ public:
    *
    * @return True if the two foot poses have been set successfully.
    */
-  void goalPoseCallback(
-      const geometry_msgs::PoseStampedConstPtr& goal_pose);
+  void goalPoseCallback(const geometry_msgs::PoseStampedConstPtr& goal_pose);
   /**
    * @brief Callback to set the start pose as a robot pose centered
    * between two feet. If the goal pose has been set previously the
@@ -175,8 +169,7 @@ public:
    *
    * @return True if the two foot poses have been set successfully.
    */
-  void startPoseCallback(
-      const geometry_msgs::PoseWithCovarianceStampedConstPtr& start_pose);
+  void startPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& start_pose);
 
   /**
    * @brief Callback to set the map.
@@ -189,10 +182,13 @@ public:
    * @brief Clear the footstep path visualization from a previous planning
    * task.
    */
-  void clearFootstepPathVis(unsigned num_footsteps=0);
+  void clearFootstepPathVis(unsigned num_footsteps = 0);
 
   /// @return Costs of the planned footstep path.
-  double getPathCosts() const { return ivPathCost; }
+  double getPathCosts() const
+  {
+    return ivPathCost;
+  }
 
   /// @return Number of expanded states.
   size_t getNumExpandedStates() const
@@ -201,16 +197,34 @@ public:
   }
 
   /// @return Number of planned foot poses.
-  size_t getNumFootPoses() const { return ivPath.size(); }
+  size_t getNumFootPoses() const
+  {
+    return ivPath.size();
+  }
 
-  state_iter_t getPathBegin() const { return ivPath.begin(); }
-  state_iter_t getPathEnd() const { return ivPath.end(); }
+  state_iter_t getPathBegin() const
+  {
+    return ivPath.begin();
+  }
+  state_iter_t getPathEnd() const
+  {
+    return ivPath.end();
+  }
 
   /// @return Size of the planned path.
-  int getPathSize() { return ivPath.size(); }
+  int getPathSize()
+  {
+    return ivPath.size();
+  }
 
-  State getStartFootLeft() { return ivStartFootLeft; }
-  State getStartFootRight() { return ivStartFootRight; }
+  State getStartFootLeft()
+  {
+    return ivStartFootLeft;
+  }
+  State getStartFootRight()
+  {
+    return ivStartFootRight;
+  }
 
   /// @brief Reset the previous planning information.
   void reset();
@@ -219,7 +233,10 @@ public:
   void resetTotally();
 
   /// @return True if for the current start and goal pose a path exists.
-  bool pathExists() { return (bool)ivPath.size(); }
+  bool pathExists()
+  {
+    return (bool)ivPath.size();
+  }
 
   /// @brief Planning parameters.
   environment_params ivEnvironmentParams;
@@ -232,7 +249,7 @@ protected:
   void broadcastPathVis();
 
   /// helper to create service response
-  void extractFootstepsSrv(std::vector<humanoid_nav_msgs::StepTarget> & footsteps) const;
+  void extractFootstepsSrv(std::vector<humanoid_nav_msgs::StepTarget>& footsteps) const;
 
   /**
    * @return True if the newly calculated path is different from the existing
@@ -247,8 +264,7 @@ protected:
   bool extractPath(const std::vector<int>& state_ids);
 
   /// @brief Generates a visualization msgs for a foot pose.
-  void footPoseToMarker(const State& footstep,
-                        visualization_msgs::Marker* marker);
+  void footPoseToMarker(const State& footstep, visualization_msgs::Marker* marker);
 
   /**
    * @brief Starts the planning task in the underlying SBPL.
@@ -280,24 +296,24 @@ protected:
   State ivGoalFootLeft;
   State ivGoalFootRight;
 
-  ros::Publisher  ivExpandedStatesVisPub;
-  ros::Publisher  ivFootstepPathVisPub;
-  ros::Publisher  ivRandomStatesVisPub;
+  ros::Publisher ivExpandedStatesVisPub;
+  ros::Publisher ivFootstepPathVisPub;
+  ros::Publisher ivRandomStatesVisPub;
   ros::Subscriber ivGridMapSub;
-  ros::Publisher  ivHeuristicPathVisPub;
-  ros::Publisher  ivPathVisPub;
-  ros::Publisher  ivStartPoseVisPub;
+  ros::Publisher ivHeuristicPathVisPub;
+  ros::Publisher ivPathVisPub;
+  ros::Publisher ivStartPoseVisPub;
   ros::ServiceServer ivFootstepPlanService;
   ros::ServiceServer ivFootstepPlanFeetService;
 
   double ivFootSeparation;
   double ivMaxStepWidth;
-  int    ivCollisionCheckAccuracy;
+  int ivCollisionCheckAccuracy;
 
-  bool   ivStartPoseSetUp, ivGoalPoseSetUp;
-  int    ivLastMarkerMsgSize;
+  bool ivStartPoseSetUp, ivGoalPoseSetUp;
+  int ivLastMarkerMsgSize;
   double ivPathCost;
-  bool   ivSearchUntilFirstSolution;
+  bool ivSearchUntilFirstSolution;
   double ivMaxSearchTime;
   double ivInitialEpsilon;
 
@@ -305,13 +321,13 @@ protected:
    * @brief If limit of changed cells is reached the planner starts a new
    * task from the scratch.
    */
-   int ivChangedCellsLimit;
+  int ivChangedCellsLimit;
 
   std::string ivPlannerType;
   std::string ivMarkerNamespace;
 
   std::vector<int> ivPlanningStatesIds;
 };
-}
+}  // namespace footstep_planner
 
 #endif  // FOOTSTEP_PLANNER_FOOTSTEPPLANNER_H_
