@@ -49,6 +49,7 @@ protected:
 
   ros::ServiceServer ivFootstepPlanService;
   ros::ServiceServer ivFootstepPlanFeetService;
+  ros::ServiceServer ivReloadService;
 };
 }  // namespace footstep_planner
 #endif  // FOOTSTEP_PLANNER_FOOTSTEPPLANNERNODE_H_

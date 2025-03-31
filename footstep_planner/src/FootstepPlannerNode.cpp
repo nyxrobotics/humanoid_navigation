@@ -37,6 +37,8 @@ FootstepPlannerNode::FootstepPlannerNode()
   ivFootstepPlanService = nh.advertiseService("plan_footsteps", &FootstepPlanner::planService, &ivFootstepPlanner);
   ivFootstepPlanFeetService =
       nh.advertiseService("plan_footsteps_feet", &FootstepPlanner::planFeetService, &ivFootstepPlanner);
+  ivReloadService =
+      nh.advertiseService("reload_footsteps_params", &FootstepPlanner::reloadParamsService, &ivFootstepPlanner);
 }
 
 FootstepPlannerNode::~FootstepPlannerNode()

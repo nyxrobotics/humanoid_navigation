@@ -460,6 +460,143 @@ bool FootstepPlanner::plan(float start_x, float start_y, float start_theta, floa
   return plan(false);
 }
 
+bool FootstepPlanner::reloadParamsService(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+{
+  ROS_INFO("Reloading footstep planner parameters...");
+
+  ros::NodeHandle nh_private("~");
+
+  std::string heuristic_type;
+  double diff_angle_cost;
+
+  // Reload all parameters from the parameter server
+  nh_private.param("heuristic_type", heuristic_type, std::string("EuclideanHeuristic"));
+  nh_private.param("heuristic_scale", ivEnvironmentParams.heuristic_scale, 1.0);
+  nh_private.param("max_hash_size", ivEnvironmentParams.hash_table_size, 65536);
+  nh_private.param("accuracy/collision_check", ivEnvironmentParams.collision_check_accuracy, 2);
+  nh_private.param("accuracy/cell_size", ivEnvironmentParams.cell_size, 0.01);
+  nh_private.param("accuracy/num_angle_bins", ivEnvironmentParams.num_angle_bins, 64);
+  nh_private.param("step_cost", ivEnvironmentParams.step_cost, 0.05);
+  nh_private.param("diff_angle_cost", diff_angle_cost, 0.0);
+
+  nh_private.param("planner_type", ivPlannerType, std::string("ARAPlanner"));
+  nh_private.param("search_until_first_solution", ivSearchUntilFirstSolution, false);
+  nh_private.param("allocated_time", ivMaxSearchTime, 7.0);
+  nh_private.param("forward_search", ivEnvironmentParams.forward_search, false);
+  nh_private.param("initial_epsilon", ivInitialEpsilon, 3.0);
+  nh_private.param("changed_cells_limit", ivChangedCellsLimit, 20000);
+  nh_private.param("num_random_nodes", ivEnvironmentParams.num_random_nodes, 20);
+  nh_private.param("random_node_dist", ivEnvironmentParams.random_node_distance, 1.0);
+
+  nh_private.param("foot/size/x", ivEnvironmentParams.footsize_x, 0.16);
+  nh_private.param("foot/size/y", ivEnvironmentParams.footsize_y, 0.06);
+  nh_private.param("foot/size/z", ivEnvironmentParams.footsize_z, 0.015);
+  nh_private.param("foot/separation", ivFootSeparation, 0.1);
+  nh_private.param("foot/origin_shift/x", ivEnvironmentParams.foot_origin_shift_x, 0.02);
+  nh_private.param("foot/origin_shift/y", ivEnvironmentParams.foot_origin_shift_y, 0.0);
+  nh_private.param("foot/max/step/x", ivEnvironmentParams.max_footstep_x, 0.08);
+  nh_private.param("foot/max/step/y", ivEnvironmentParams.max_footstep_y, 0.16);
+  nh_private.param("foot/max/step/theta", ivEnvironmentParams.max_footstep_theta, 0.3);
+  nh_private.param("foot/max/inverse/step/x", ivEnvironmentParams.max_inverse_footstep_x, -0.04);
+  nh_private.param("foot/max/inverse/step/y", ivEnvironmentParams.max_inverse_footstep_y, 0.09);
+  nh_private.param("foot/max/inverse/step/theta", ivEnvironmentParams.max_inverse_footstep_theta, -0.3);
+
+  // Reload footstep set
+  XmlRpc::XmlRpcValue footsteps_x, footsteps_y, footsteps_theta;
+  nh_private.getParam("footsteps/x", footsteps_x);
+  nh_private.getParam("footsteps/y", footsteps_y);
+  nh_private.getParam("footsteps/theta", footsteps_theta);
+
+  int size_x = footsteps_x.size();
+  int size_y = footsteps_y.size();
+  int size_t = footsteps_theta.size();
+  if (size_x != size_y || size_x != size_t)
+  {
+    ROS_ERROR("Footstep parameterization has different sizes for x/y/theta.");
+    return false;
+  }
+
+  ivEnvironmentParams.footstep_set.clear();
+  double max_step_width = 0.0;
+  for (int i = 0; i < size_x; ++i)
+  {
+    double x = static_cast<double>(footsteps_x[i]);
+    double y = static_cast<double>(footsteps_y[i]);
+    double theta = static_cast<double>(footsteps_theta[i]);
+
+    Footstep f(x, y, theta, ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
+               ivEnvironmentParams.hash_table_size);
+    ivEnvironmentParams.footstep_set.push_back(f);
+
+    double step_width = sqrt(x * x + y * y);
+    if (step_width > max_step_width)
+      max_step_width = step_width;
+  }
+
+  // Reload step range
+  XmlRpc::XmlRpcValue step_range_x, step_range_y;
+  nh_private.getParam("step_range/x", step_range_x);
+  nh_private.getParam("step_range/y", step_range_y);
+  if (step_range_x.size() != step_range_y.size())
+  {
+    ROS_ERROR("Step range points have different size.");
+    return false;
+  }
+
+  ivEnvironmentParams.step_range.clear();
+  double max_x = 0.0, max_y = 0.0;
+  for (int i = 0; i < step_range_x.size(); ++i)
+  {
+    double x = static_cast<double>(step_range_x[i]);
+    double y = static_cast<double>(step_range_y[i]);
+    if (fabs(x) > max_x)
+      max_x = fabs(x);
+    if (fabs(y) > max_y)
+      max_y = fabs(y);
+    ivEnvironmentParams.step_range.emplace_back(disc_val(x, ivEnvironmentParams.cell_size),
+                                                disc_val(y, ivEnvironmentParams.cell_size));
+  }
+  ivEnvironmentParams.step_range.push_back(ivEnvironmentParams.step_range[0]);
+  ivEnvironmentParams.max_step_width = sqrt(max_x * max_x + max_y * max_y) * 1.5;
+
+  // Rebuild heuristic
+  boost::shared_ptr<Heuristic> h;
+  if (heuristic_type == "EuclideanHeuristic")
+  {
+    h.reset(new EuclideanHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins));
+    ROS_INFO("Reloaded EuclideanHeuristic");
+  }
+  else if (heuristic_type == "EuclStepCostHeuristic")
+  {
+    h.reset(new EuclStepCostHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
+                                      ivEnvironmentParams.step_cost, diff_angle_cost, max_step_width));
+    ROS_INFO("Reloaded EuclStepCostHeuristic");
+  }
+  else if (heuristic_type == "PathCostHeuristic")
+  {
+    double foot_incircle =
+        std::min((ivEnvironmentParams.footsize_x / 2.0 - fabs(ivEnvironmentParams.foot_origin_shift_x)),
+                 (ivEnvironmentParams.footsize_y / 2.0 - fabs(ivEnvironmentParams.foot_origin_shift_y)));
+    h.reset(new PathCostHeuristic(ivEnvironmentParams.cell_size, ivEnvironmentParams.num_angle_bins,
+                                  ivEnvironmentParams.step_cost, diff_angle_cost, max_step_width, foot_incircle));
+    ivPathCostHeuristicPtr = boost::dynamic_pointer_cast<PathCostHeuristic>(h);
+    ROS_INFO("Reloaded PathCostHeuristic");
+  }
+  else
+  {
+    ROS_ERROR_STREAM("Unknown heuristic: " << heuristic_type);
+    return false;
+  }
+  ivEnvironmentParams.heuristic = h;
+
+  // Reset environment and planner
+  ivPlannerEnvironmentPtr.reset(new FootstepPlannerEnvironment(ivEnvironmentParams));
+  setPlanner();
+
+  ROS_INFO("Parameter reload complete.");
+  return true;
+}
+
 bool FootstepPlanner::planService(humanoid_nav_msgs::PlanFootsteps::Request& req,
                                   humanoid_nav_msgs::PlanFootsteps::Response& resp)
 {
@@ -1019,4 +1156,5 @@ void FootstepPlanner::footPoseToMarker(const State& foot_pose, visualization_msg
 
   marker->lifetime = ros::Duration();
 }
+
 }  // namespace footstep_planner

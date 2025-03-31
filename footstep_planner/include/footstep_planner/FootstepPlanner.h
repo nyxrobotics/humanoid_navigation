@@ -35,6 +35,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud.h>
+#include <std_srvs/Empty.h>
 #include <tf/tf.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -81,6 +82,9 @@ public:
    * @return Success of planning.
    */
   bool replan();
+
+  /// @brief Service to reload parameters from the ROS parameter server.
+  bool reloadParamsService(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);  // ← 追加
 
   /// @brief Service handle to plan footsteps.
   bool planService(humanoid_nav_msgs::PlanFootsteps::Request& req, humanoid_nav_msgs::PlanFootsteps::Response& resp);
@@ -303,6 +307,7 @@ protected:
   ros::Publisher ivHeuristicPathVisPub;
   ros::Publisher ivPathVisPub;
   ros::Publisher ivStartPoseVisPub;
+  ros::ServiceServer ivReloadService;
   ros::ServiceServer ivFootstepPlanService;
   ros::ServiceServer ivFootstepPlanFeetService;
 
