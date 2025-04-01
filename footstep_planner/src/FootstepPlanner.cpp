@@ -31,9 +31,8 @@ FootstepPlanner::FootstepPlanner()
 {
   // private NodeHandle for parameters and private messages (debug / info)
   ros::NodeHandle nh_private("~");
-  ros::NodeHandle nh_public;
 
-  // ..publishers
+  // publishers
   ivExpandedStatesVisPub = nh_private.advertise<sensor_msgs::PointCloud>("expanded_states", 1);
   ivRandomStatesVisPub = nh_private.advertise<sensor_msgs::PointCloud>("random_states", 1);
   ivFootstepPathVisPub = nh_private.advertise<visualization_msgs::MarkerArray>("footsteps_array", 1);
@@ -507,7 +506,12 @@ bool FootstepPlanner::reloadParamsService(std_srvs::Empty::Request& req, std_srv
   nh_private.getParam("footsteps/x", footsteps_x);
   nh_private.getParam("footsteps/y", footsteps_y);
   nh_private.getParam("footsteps/theta", footsteps_theta);
-
+  if (footsteps_x.getType() != XmlRpc::XmlRpcValue::TypeArray)
+    ROS_ERROR("Error reading footsteps/x from config file.");
+  if (footsteps_y.getType() != XmlRpc::XmlRpcValue::TypeArray)
+    ROS_ERROR("Error reading footsteps/y from config file.");
+  if (footsteps_theta.getType() != XmlRpc::XmlRpcValue::TypeArray)
+    ROS_ERROR("Error reading footsteps/theta from config file.");
   int size_x = footsteps_x.size();
   int size_y = footsteps_y.size();
   int size_t = footsteps_theta.size();
@@ -592,6 +596,27 @@ bool FootstepPlanner::reloadParamsService(std_srvs::Empty::Request& req, std_srv
 
   // Reset environment and planner
   ivPlannerEnvironmentPtr.reset(new FootstepPlannerEnvironment(ivEnvironmentParams));
+
+  // set up planner
+  if (ivPlannerType == "ARAPlanner" || ivPlannerType == "ADPlanner" || ivPlannerType == "RSTARPlanner")
+  {
+    ROS_INFO_STREAM("Planning with " << ivPlannerType);
+  }
+  else
+  {
+    ROS_ERROR_STREAM("Planner " << ivPlannerType
+                                << " not available / "
+                                   "untested.");
+    exit(1);
+  }
+  if (ivEnvironmentParams.forward_search)
+  {
+    ROS_INFO_STREAM("Search direction: forward planning");
+  }
+  else
+  {
+    ROS_INFO_STREAM("Search direction: backward planning");
+  }
   setPlanner();
 
   // Restore the previous map
