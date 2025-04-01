@@ -463,9 +463,10 @@ bool FootstepPlanner::plan(float start_x, float start_y, float start_theta, floa
 bool FootstepPlanner::reloadParamsService(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
 {
   ROS_INFO("Reloading footstep planner parameters...");
+  // Backup existing map
+  gridmap_2d::GridMap2DPtr old_map = ivMapPtr;
 
   ros::NodeHandle nh_private("~");
-
   std::string heuristic_type;
   double diff_angle_cost;
 
@@ -592,6 +593,13 @@ bool FootstepPlanner::reloadParamsService(std_srvs::Empty::Request& req, std_srv
   // Reset environment and planner
   ivPlannerEnvironmentPtr.reset(new FootstepPlannerEnvironment(ivEnvironmentParams));
   setPlanner();
+
+  // Restore the previous map
+  if (old_map)
+  {
+    ivMapPtr = old_map;
+    ivPlannerEnvironmentPtr->updateMap(ivMapPtr);
+  }
 
   ROS_INFO("Parameter reload complete.");
   return true;
